@@ -1,0 +1,42 @@
+This project consists of 3 files:
+
+TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
+    from http://github.com/wgbartley/TED_PHP.  I found and fixed some problems:
+      * The 'get_username()' function had '()' after 'this->username'.
+      * In function 'init_url() function had a reference to '$ssl'.  This
+            should have been '$this->ssl.
+      * I activated the commented code in 'init_curl()' after changing
+            '$ssl' to '$this->ssl'.
+      * I added values to those passed to the class when called.
+      * I reformatted the code to make it easier for me to understand
+            while finding the problems.
+
+TEDtoDB.php - An application to load a table with kWh and $ data for all
+   history intervals.  The kWh and $ values from TED are adjusted so that
+   60 minute records will add up to one hour record, and so on.
+
+combined_history.sql - to create the table on MySQL.
+
+To run the program from Windows Scheduler:
+    TEDtoDB.php --interval minute --quiet
+        (every 10 minutes)
+    TEDtoDB.php --interval hour   --quiet
+        (every hour at 15 minutes after the hour)
+    TEDtoDB.php --interval day    --quiet
+        (every day at 01:30:00)
+    TEDtoDB.php --interval month  --quiet
+        (every 1st day of the month at 01:15:00)
+
+I was running the hour and day jobs at 5 minutes after the event but discovered
+that a bogus record was inserted with incorrect values that were updated the
+following run.  The run times above work as expected.
+
+I have not yet had the scheduler run a new month job.
+
+I don't collect second data.  The script will if you need it.
+
+To get things started run the job once for each interval after you have
+created the table in the database and you will collect everything that TED has.
+
+If you have more than one MTU (I don't) I expect that the script will discover
+them.  Post a reply if this does not happen.
