@@ -1,0 +1,122 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+	<title>Michael-W/TEDtoDB @ GitHub</title>
+	
+	<style type="text/css">
+		body {
+  		margin-top: 1.0em;
+  		background-color: #f0e851;
+		  font-family: "Helvetica,Arial,FreeSans";
+  		color: #000000;
+    }
+    #container {
+      margin: 0 auto;
+      width: 700px;
+    }
+		h1 { font-size: 3.8em; color: #0f17ae; margin-bottom: 3px; }
+		h1 .small { font-size: 0.4em; }
+		h1 a { text-decoration: none }
+		h2 { font-size: 1.5em; color: #0f17ae; }
+    h3 { text-align: center; color: #0f17ae; }
+    a { color: #0f17ae; }
+    .description { font-size: 1.2em; margin-bottom: 30px; margin-top: 30px; font-style: italic;}
+    .download { float: right; }
+		pre { background: #000; color: #fff; padding: 15px;}
+    hr { border: 0; width: 80%; border-bottom: 1px solid #aaa}
+    .footer { text-align:center; padding-top:30px; font-style: italic; }
+	</style>
+	
+</head>
+
+<body>
+  <a href="http://github.com/Michael-W/TEDtoDB"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub" /></a>
+
+  <div id="container">
+
+    <div class="download">
+      <a href="http://github.com/Michael-W/TEDtoDB/zipball/master">
+        <img border="0" width="90" src="http://github.com/images/modules/download/zip.png"></a>
+      <a href="http://github.com/Michael-W/TEDtoDB/tarball/master">
+        <img border="0" width="90" src="http://github.com/images/modules/download/tar.png"></a>
+    </div>
+
+    <h1><a href="http://github.com/Michael-W/TEDtoDB">TEDtoDB</a>
+      <span class="small">by <a href="http://github.com/Michael-W">Michael-W</a></span></h1>
+
+    <div class="description">
+      PHP to load TED5000 (http://TheEnergyDetective.com) into a MySQL table
+    </div>
+
+    <p>This project consists of three files:
+
+TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
+    from http://github.com/wgbartley/TED_PHP.  I found and fixed some problems:
+      * The 'get_username()' function had '()' after 'this->username'.
+      * In function 'init_url() function had a reference to '$ssl'.  This
+            should have been '$this->ssl.
+      * I activated the commented code in 'init_curl()' after changing
+            '$ssl' to '$this->ssl'.
+      * I added values to those passed to the class when called.
+      * I reformatted the code to make it easier for me to understand
+            while finding the problems.
+
+TEDtoDB.php - An application to load a table with kWh and $ data for all
+   history intervals.  The kWh and $ values from TED are adjusted so that
+   60 minute records will add up to one hour record, and so on.
+
+combined_history.sql - to create the table on MySQL.
+
+To run the program from Windows Scheduler:
+    TEDtoDB.php --interval minute --quiet
+        (every 10 minutes)
+    TEDtoDB.php --interval hour   --quiet
+        (every hour at 15 minutes after the hour)
+    TEDtoDB.php --interval day    --quiet
+        (every day at 01:30:00)
+    TEDtoDB.php --interval month  --quiet
+        (every 1st day of the month at 01:15:00)
+
+I was running the hour and day jobs at 5 minutes after the event but discovered
+that a bogus record was inserted with incorrect values that were updated the
+following run.  The run times above work as expected.
+
+I have not yet had the scheduler run a new month job.
+
+I don't collect second data.  The script will if you need it.
+
+To get things started run the job once for each interval after you have
+created the table in the database and you will collect everything that TED has.
+
+If you have more than one MTU (I don't) I expect that the script will discover them.</p><h2>Dependencies</h2>
+<p>PHP and MySQL - Developed with PHP 5.3.3 and MySQL</p>
+<h2>License</h2>
+<p>GNU GPL</p>
+<h2>Authors</h2>
+<p>Michael Wetmore<br/>      </p>
+
+
+    <h2>Download</h2>
+    <p>
+      You can download this project in either
+      <a href="http://github.com/Michael-W/TEDtoDB/zipball/master">zip</a> or
+      <a href="http://github.com/Michael-W/TEDtoDB/tarball/master">tar</a> formats.
+    </p>
+    <p>You can also clone the project with <a href="http://git-scm.com">Git</a>
+      by running:
+      <pre>$ git clone git://github.com/Michael-W/TEDtoDB</pre>
+    </p>
+
+    <div class="footer">
+      get the source code on GitHub : <a href="http://github.com/Michael-W/TEDtoDB">Michael-W/TEDtoDB</a>
+    </div>
+
+  </div>
+
+  
+</body>
+</html>
