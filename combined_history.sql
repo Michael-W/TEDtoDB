@@ -1,4 +1,4 @@
-
+-- Michael Wetmore 20 November 2010
 --
 -- Table structure for table `combined_history`
 --

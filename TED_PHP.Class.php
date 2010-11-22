@@ -1,4 +1,5 @@
 <?php
+/* Original by Garrett Bartley */
 class TED_PHP {
 	private $host,
 		$port,

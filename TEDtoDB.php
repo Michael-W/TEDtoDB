@@ -1,4 +1,5 @@
 <?php
+/* by Michael Wetmore November 20 2010 */
 $debug = FALSE;
 /*
 * TED Settings - ## are changed by this script to its requirements.
