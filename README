@@ -2,7 +2,8 @@ This project consists of three files:
 
 TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
     from http://github.com/wgbartley/TED_PHP.  I found and fixed some problems:
-      * The 'get_username()' function had '()' after 'this->username'.
+      * The 'get_username()' function had '()' after 'this->username'
+            which caused a PHP error.
       * In function 'init_url() function had a reference to '$ssl'.  This
             should have been '$this->ssl.
       * I activated the commented code in 'init_curl()' after changing
@@ -11,13 +12,14 @@ TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
       * I reformatted the code to make it easier for me to understand
             while finding the problems.
 
-TEDtoDB.php - An application to load a table with kWh and $ data for all
-   history intervals.  The kWh and $ values from TED are adjusted so that
-   60 minute records will add up to one hour record, and so on.
+TEDtoDB.php - An application to load a table with kWh and cost data for all
+   history intervals.  The kWh and cost values from TED are adjusted so that
+   sixty minute records will add up to one hour record, and so on.
 
-combined_history.sql - to create the table on MySQL.
+combined_history.sql - A Drop/Add to create the MySQL table.
 
-To run the program from Windows Scheduler:
+Scheduler examples (the short or long options can be used in either case):
+To run the program from Windows Scheduler (long options example):
     TEDtoDB.php --interval minute --quiet
         (every 10 minutes)
     TEDtoDB.php --interval hour   --quiet
@@ -27,9 +29,16 @@ To run the program from Windows Scheduler:
     TEDtoDB.php --interval month  --quiet
         (every 1st day of the month at 01:15:00)
 
+To run the program from cron (short options example):
+    0,10,20,20,40,50 * * * * /path/to/php -f /path/to/TEDtoDB.php -q -i m
+    15 * * * * /path/to/php -f /path/to/TEDtoDB.php -q -i h
+    30 1 * * * /path/to/php -f /path/to/TEDtoDB.php -q -i d
+    15 1 1 * * /path/to/php -f /path/to/TEDtoDB.php -q -i o
+
 I was running the hour and day jobs at 5 minutes after the event but discovered
-that a bogus record was inserted with incorrect values that were updated the
-following run.  The run times above work as expected.
+that a bogus record was inserted with incorrect values. The values were updated on
+the next run for the interval so it was no problem in the end, but it confused me.
+The suggested run times above don't do this.
 
 I have not yet had the scheduler run a new month job.
 
@@ -39,4 +48,4 @@ To get things started run the job once for each interval after you have
 created the table in the database and you will collect everything that TED has.
 
 If you have more than one MTU (I don't) I expect that the script will discover
-them.  Post a reply if this does not happen.
+them.  Post a reply in the forum if this does not happen.
