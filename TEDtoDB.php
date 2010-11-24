@@ -26,7 +26,7 @@ $TED_DB_NAME = 'ted';       # Database name
 $TED_DB_USER = 'root';      # Username to access the database
 $TED_DB_PASS = 'password';  # Password to access the database
 /*
-* It would be nicer to be able to call the GetoptPlus help.  How?
+* It would be nicer to be able to call the GetoptPlus help. How?
 */
 function help() {
     echo PHP_EOL."TEDtoDB Usage:".PHP_EOL;
@@ -232,12 +232,15 @@ EOQ;
         $result->close();
         if ($max_offset < 0) $max_offset = 1;
         $records_to_get = $last_update + $max_offset + 1;
-        if (! $quiet)
-            echo PHP_EOL."  * For MTU".$mtu.":".PHP_EOL."\tLast update was "
+        if (! $quiet) {
+            echo PHP_EOL."  * For MTU".$mtu.":".PHP_EOL
+                ."\tLast update was "
                 .number_format($last_update)
                 .$intervalword.'s ago.'
                 ."  Will retrieve "
-                .number_format($records_to_get).' records from TED.'.PHP_EOL;
+                .number_format($records_to_get)
+                .' records from TED.'.PHP_EOL;
+        }
         $ted->set_mtu($mtu - 1);
         if (! $quiet && $debug) {
             $settings = array('host', 'port', 'username', 'password',
@@ -314,13 +317,14 @@ EOQ;
                 if($a % 1250 == 0) echo PHP_EOL;
             }
         }
-    /* Output number of records updated and inserted */
-    if (! $quiet)
-        echo
-         "\tInserted ".number_format($inserted_rows)
-        ." and updated ".number_format($updated_rows)
-        ." SQL records from ".number_format($recs_found)
-        ." TED records.".PHP_EOL;
+        /* Output number of records updated and inserted */
+        if (! $quiet) {
+            echo
+             "\tInserted ".number_format($inserted_rows)
+            ." and updated ".number_format($updated_rows)
+            ." SQL records from ".number_format($recs_found)
+            ." TED records.".PHP_EOL;
+        }
     }
 }
 if (! $quiet) 
