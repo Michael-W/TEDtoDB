@@ -1,7 +1,8 @@
 This project consists of three files:
 
 TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
-    from http://github.com/wgbartley/TED_PHP.  I found and fixed some problems:
+    from http://github.com/wgbartley/TED_PHP.
+    I found and fixed some problems:
       * The 'get_username()' function had '()' after 'this->username'
             which caused a PHP error.
       * In function 'init_url() function had a reference to '$ssl'.  This
@@ -13,39 +14,83 @@ TED_PHP.Class.php - This is the TED_PHP class by Garrett Bartley available
             while finding the problems.
 
 TEDtoDB.php - An application to load a table with kWh and cost data for all
-   history intervals.  The kWh and cost values from TED are adjusted so that
-   sixty minute records will add up to one hour record, and so on.
+   history intervals.  The kWh and cost values from TED are adjusted so
+   that sixty minute records will add up to one hour record, and so on.
 
 combined_history.sql - A Drop/Add to create the MySQL table.
 
 Scheduler examples (the short or long options can be used in either case):
 To run the program from Windows Scheduler (long options example):
-    TEDtoDB.php --interval minute --quiet
+    TEDtoDB.php --quiet minute
         (every 10 minutes)
-    TEDtoDB.php --interval hour   --quiet
+    TEDtoDB.php --quiet hour
         (every hour at 15 minutes after the hour)
-    TEDtoDB.php --interval day    --quiet
+    TEDtoDB.php --quiet day
         (every day at 01:30:00)
-    TEDtoDB.php --interval month  --quiet
+    TEDtoDB.php --quiet month
         (every 1st day of the month at 01:15:00)
 
 To run the program from cron (short options example):
     0,10,20,20,40,50 * * * * /path/to/php -f /path/to/TEDtoDB.php -q -i m
-    15 * * * * /path/to/php -f /path/to/TEDtoDB.php -q -i h
-    30 1 * * * /path/to/php -f /path/to/TEDtoDB.php -q -i d
-    15 1 1 * * /path/to/php -f /path/to/TEDtoDB.php -q -i o
+    15 * * * * /path/to/php -f /path/to/TEDtoDB.php -q h
+    30 1 * * * /path/to/php -f /path/to/TEDtoDB.php -q d
+    15 1 1 * * /path/to/php -f /path/to/TEDtoDB.php -q o
 
-I was running the hour and day jobs at 5 minutes after the event but discovered
-that a bogus record was inserted with incorrect values. The values were updated on
-the next run for the interval so it was no problem in the end, but it confused me.
-The suggested run times above don't do this.
+You will probably have to use additional options to specify the database
+ and TED parameters.
+
+Executing 'TEDtoDB.php --help' will display this:
+---------------------------------------------------------------------------
+TEDtoDB.php Version: 1.1.0 28 November 2010
+
+Usage: TEDtoDB.php [options to overide defaults] <one required parameter>
+Options:
+-h --help                 This help.
+
+-q --quiet                Suppress progress messages.
+                            The default is FALSE.
+-d --debug                Show values passed to TED
+                            The default is FALSE.
+-l --log <arg>            Log activity to the file named in the argument.
+                            The default is no log.
+--dbhost <arg>            The database server's IP or name.
+                            The default is 'localhost'.
+--dbname <arg>            The database name on the server.
+                            The default is 'ted'.
+--dbtable <arg>           The table in the database.
+                            The default is 'combined_history'.
+--dbuser <arg>            The user ID to access the database.
+                            The default is 'root'.
+--dbpass <arg>            The database user's password.
+                            The default is 'password'.
+--tdhost <arg>            TED's IP address or name.
+                            The default is 'ted5000'.
+--tdport <arg>            TED's webserver port.
+                            The default is 80.
+--tduser <arg>            User ID to log in to TED.
+                            The default is ''.
+--tdpass <arg>            User ID to log in to TED.
+                            The default is ''.
+--tdssl                   Use SSL (https:) to access TED.
+                            The default is FALSE.
+Parameters:
+        <s or second | m or minute | h or hour | d or day | o or month>.
+        Selects which TED history to pass to the database.
+---------------------------------------------------------------------------
+
+I was running the hour and day jobs at 5 minutes after the event but
+discovered that a bogus record was inserted with incorrect values.
+The values were updated on the next run for the interval so it was no
+problem in the end, but it confused me.  The suggested run times above
+don't do this.
 
 I have not yet had the scheduler run a new month job.
 
 I don't collect second data.  The script will if you need it.
 
 To get things started run the job once for each interval after you have
-created the table in the database and you will collect everything that TED has.
+created the table in the database and you will collect all the hiatory
+that TED has.
 
-If you have more than one MTU (I don't) I expect that the script will discover
-them.  Post a reply in the forum if this does not happen.
+If you have more than one MTU (I don't) I expect that the script will
+discover them.  Post a reply in the forum if this does not happen.

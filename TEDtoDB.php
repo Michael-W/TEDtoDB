@@ -1,183 +1,308 @@
 <?php
-/* by Michael Wetmore November 20 2010 */
-$debug = FALSE;
+# By Michael Wetmore.
+# VERSIONS:
+# $version = '1.0.0 23 November 2010';
+$version = '1.1.0 28 November 2010';
 /*
-* TED Settings - ## are changed by this script to its requirements.
-* The others should be changed to reflect your environment.
+    Revised command line to make sense.  Now 'minute' etc. is a parameter
+        not an option.
+    Added option to log run data to a file.
+    Added options for all TED and MySQL parameters.
 */
-$TED_HOSTNAME = 'ted5000';  # The hostname of the TED gateway device
-$TED_PORT = 80;             # The port number of the TED gateway device
-$TED_USERNAME = '';         # The authentication username
-$TED_PASSWORD = '';         # The authentication password
-$TED_SSL = FALSE;           # Enable/Disable SSL (TRUE or FALSE)
-$TED_API = 'minutehistory'; ## livedata | secondhistory | minutehistory
-                            ## | hour(ly)history | month(ly)history
-$TED_MTU = 0;               ## The MTU number for data (0-3)
-$TED_TYPE = 'all';          ## power | cost | voltage | all
-$TED_FORMAT = 'raw';        ## raw | xml | csv
-                            # NOTE: The livedata API only returns XML.
-$TED_TABLE =
-    'combined_history';     # the table to use
+# $version = 'next - sometime soon';
 /*
-* Database connection information
+    Option to log to a database table.
+    Create database tables if not found.
+    Options to delete minute and/or second history after a defined time.
 */
-$TED_DB_HOST = 'localhost'; # The database
-$TED_DB_NAME = 'ted';       # Database name
-$TED_DB_USER = 'root';      # Username to access the database
-$TED_DB_PASS = 'password';  # Password to access the database
-/*
-* It would be nicer to be able to call the GetoptPlus help. How?
+/************************************************************************
+  Program Settings -    ## are changed by this script to its requirements.
+                        #* are defaults that may be changed with command
+                            line options.
 */
-function help() {
-    echo PHP_EOL."TEDtoDB Usage:".PHP_EOL;
-    echo PHP_EOL."\tREQUIRED:".PHP_EOL;
-    echo "\t-i         's'econd | 'm'inute | 'h'our | 'd'ay | m'o'nth"
-        .PHP_EOL;
-    echo "\tOR".PHP_EOL;
-    echo "\t--interval 'second' | 'minute' | 'hour' | 'day' | 'month'"
-        .PHP_EOL;
-    echo PHP_EOL."\tOPTIONAL:".PHP_EOL;
-    echo "\t[ -q | --quiet ]\t\tsuppress all progress messages"
-        .PHP_EOL;
-    echo "\t[ -h | --help  ]\t\tHelp".PHP_EOL;
-    echo PHP_EOL;
-    echo "\tExample: ".basename($_SERVER['argv'][0])." -i s -q"
-        .PHP_EOL;
-    echo "\tExample: ".basename($_SERVER['argv'][0])
-            ." --interval minute --quiet".PHP_EOL;
-    exit;
-}
+$TED_HOSTNAME = 'ted5000';  #* The hostname of the TED gateway device
+$TED_PORT     = 80;         #* The port number of the TED gateway device
+$TED_USERNAME = '';         #* The authentication username
+$TED_PASSWORD = '';         #* The authentication password
+$TED_SSL      = FALSE;      #* Enable/Disable SSL (TRUE or FALSE)
+$TED_API      = 'minutehistory'; ## livedata (always returns XML)
+//                          | secondhistory | minutehistory
+//                          | hour(ly)history | month(ly)history
+$TED_MTU      = 0;          ## The MTU number for data (0-3)
+$TED_TYPE     = 'all';      ## power | cost | voltage | all
+$TED_FORMAT   = 'raw';      ## raw | xml | csv
+$TED_DB_HOST  = 'localhost';#* The database server
+$TED_DB_NAME  = 'ted';      #* Database name
+$TED_DB_USER  = 'root';     #* Username to access the database
+$TED_DB_PASS  = 'password'; #* Password to access the database
+$TED_DB_TABLE = 'combined_history'; #* the table to use
 /*
-* This function is used to convert the SimpleXMLElement
-* returned from a fetch of livedata into an array.
+This function is used to convert the SimpleXMLElement
+returned by a fetch of livedata into an array.
 */
 function simplexml2array($xml) {
-if (@get_class($xml) == 'SimpleXMLElement') {
-    $attributes = $xml->attributes();
-    foreach($attributes as $k => $v) {
-        if ($v) $a[$k] = (string)$v;
+    if (@get_class($xml) == 'SimpleXMLElement') {
+        $attributes = $xml->attributes();
+        foreach($attributes as $k => $v) {
+            if ($v) $a[$k] = (string)$v;
+        }
+        $x = $xml;
+        $xml = get_object_vars($xml);
     }
-    $x = $xml;
-    $xml = get_object_vars($xml);
-}
-if (is_array($xml)) {
-    if (count($xml) == 0) return (string)$x; // for CDATA
-    foreach($xml as $key => $value) {
-        $r[$key] = simplexml2array($value);
+    if (is_array($xml)) {
+        if (count($xml) == 0) return (string)$x; // for CDATA
+        foreach($xml as $key => $value) {
+            $r[$key] = simplexml2array($value);
+        }
+        if (isset($a)) $r['@'] = $a;    // Attributes
+        return $r;
     }
-    if (isset($a)) $r['@'] = $a;    // Attributes
-    return $r;
-}
 return (string)$xml;
 }
 /*
-* Required stuff and where to get it
+Required stuff and where to get it
 */
 require_once 'TED_PHP.class.php';
-/* http://www.garrettbartley.com/TED_PHP/ */
+                # http://www.garrettbartley.com/TED_PHP
 require_once 'Console/Getoptplus.php';
-/* http://pear.php.net/package/Console_GetoptPlus/ */
+                # http://pear.php.net/package/Console_GetoptPlus
+$parameters = "<s or second | m or minute "
+            ."| h or hour | d or day | o or month>";
 try {
     $config = array(
+        'header'  => array('', $argv[0].' Version: '.$version, ''),
+        'usage'   => array('[options to overide defaults]'
+                            .' <one required parameter>'),
         'options' => array(
-            array('long' => 'interval', 'type' => 'mandatory',
-                'short' => 'i', 'desc' => array(
-                    'arg',
-                    "'s' or 'second' for second history from TED",
-                    "'m' or 'minute' for minute history from TED",
-                    "'h' or 'hour'   for hour history from TED",
-                    "'d' or 'day'    for day history from TED",
-                    "'o' or 'month'  for month history from TED",
-                    ''
+            array('long' => 'help', 'type' => 'noarg', 'short'
+                => 'h', 'desc' => array(
+                "This help.",
+                ""
                 )
             ),
             array('long' => 'quiet', 'type' => 'noarg', 'short'
                 => 'q', 'desc' => array(
-                'Suppress progress messages',
-                ''
+                "Suppress progress messages.",
+                "\tThe default is FALSE."
+                )
+            ),
+            array('long' => 'debug', 'type' => 'noarg', 'short'
+                => 'd', 'desc' => array(
+                "Show values passed to TED",
+                "\tThe default is FALSE."
+                )
+            ),
+            array('long' => 'log', 'type' => 'mandatory', 'short'
+                => 'l', 'desc' => array(
+                'arg',
+                "Log activity to the file named in the argument.",
+                "\tThe default is no log."
+                )
+            ),
+            array('long' => 'dbhost', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "The database server's IP or name.",
+                "\tThe default is '".$TED_DB_HOST."'."
+                )
+            ),
+            array('long' => 'dbname', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "The database name on the server.",
+                "\tThe default is '".$TED_DB_NAME."'."
+                )
+            ),
+            array('long' => 'dbtable', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "The table in the database.",
+                "\tThe default is '".$TED_DB_TABLE."'."
+                )
+            ),
+            array('long' => 'dbuser', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "The user ID to access the database.",
+                "\tThe default is '".$TED_DB_USER."'."
+                )
+            ),
+            array('long' => 'dbpass', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "The database user's password.",
+                "\tThe default is '".$TED_DB_PASS."'."
+                )
+            ),
+            array('long' => 'tdhost', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "TED's IP address or name.",
+                "\tThe default is '".$TED_HOSTNAME."'."
+                )
+            ),
+            array('long' => 'tdport', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "TED's webserver port.",
+                "\tThe default is ".$TED_PORT.'.'
+                )
+            ),
+            array('long' => 'tduser', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "User ID to log in to TED.",
+                "\tThe default is '".$TED_USERNAME."'."
+                )
+            ),
+            array('long' => 'tdpass', 'type' => 'mandatory',
+                'desc' => array(
+                'arg',
+                "User ID to log in to TED.",
+                "\tThe default is '".$TED_PASSWORD."'."
+                )
+            ),
+            array('long' => 'tdssl', 'type' => 'noarg',
+                'desc' => array(
+                "Use SSL (https:) to access TED.",
+                "\tThe default is FALSE."
                 )
             )
         ),
+        'parameters' => array('',
+            $parameters.'.',
+            "Selects which TED history to pass to the database."
+        ),
     );
-    $options = Console_Getoptplus::getoptplus($config,
-                        'short2long', true, 'shortcuts');
+    $options = Console_Getoptplus::getoptplus(
+        $config,
+        'short2long',
+        TRUE,
+        'strict',
+        TRUE);
 }
 catch(Console_GetoptPlus_Exception $e) {
-    echo $e->getMessage().PHP_EOL;
-    help();
+    echo $e->getMessage().PHP_EOL."\tTry ".$argv[0]." --help".PHP_EOL;
+    exit;
 }
-$quiet = FALSE;
+/*
+Process command line options
+*/
+$quiet = FALSE; $debug = FALSE;
 if (count($options[0]) > 0) {
-    foreach($options[0] as $option => $v)
-        if ($option == 'quiet') $quiet = TRUE;
-} else help();
-switch (strtolower(trim($options[0]['interval']))) {
-    case 's':
-    case 'second':
-        $cost_divisor = 100 * 60 * 60;
-        $divisor = 1;
-        $api = 'secondhistory';
-        $intervalword = ' second';
-        $interval = 0;
-        $hist = 's';
-        break;
-    case 'm':
-    case 'minute':
-        $cost_divisor = 100 * 60;
-        $divisor = 60;
-        $api = 'minutehistory';
-        $intervalword = ' minute';
-        $interval = 1;
-        $hist = 'm';
-        break;
-    case 'h':
-    case 'hour':
-        $cost_divisor = 100;
-        $divisor = 60 * 60;
-        $api = 'hourhistory';
-        $intervalword = ' hour';
-        $interval = 2;
-        $hist = 'h';
-        break;
-    case 'd':
-    case 'day':
-        $cost_divisor = 100;
-        $divisor = 60 * 60 * 24;
-        $api = 'dayhistory';
-        $intervalword = ' day';
-        $interval = 3;
-        $hist = 'd';
-        break;
-    case 'o':
-    case 'month':
-        $cost_divisor = 100;
-        $divisor = 60 * 60 * 24 * 28;
-        $api = 'monthhistory';
-        $intervalword = ' month';
-        $interval = 4;
-        $hist = 'o';
-        break;
-    default:
-        echo "Invalid interval: "
-            .strtolower($options[0]['interval']).PHP_EOL;
-        help();
-        break;
+    foreach($options[0] as $option => $v) {
+        if ($option == 'quiet')   $quiet        = TRUE;
+        if ($option == 'debug')   $debug        = TRUE;
+        if ($option == 'log')     $log          = $v;
+        if ($option == 'dbhost')  $TED_DB_HOST  = $v;
+        if ($option == 'dbname')  $TED_DB_NAME  = $v;
+        if ($option == 'dbuser')  $TED_DB_USER  = $v;
+        if ($option == 'dbpass')  $TED_DB_PASS  = $v;
+        if ($option == 'dbtable') $TED_DB_TABLE = $v;
+        if ($option == 'tdhost')  $TED_HOSTNAME = $v;
+        if ($option == 'tduser')  $TED_USERNAME = $v;
+        if ($option == 'tdpass')  $TED_PASSWORD = $v;
+        if ($option == 'tdport')  $TED_PORT     = $v;
+        if ($option == 'tdssl')   $TED_SSL      = TRUE;
+    }
 }
-/* Start time for progress messsges */
+/*
+open or create the log file
+*/
+if (isset($log)) {
+    if (strpos($log, '\\')) $log = addslashes($log);
+    if (! is_dir(dirname($log)))
+        mkdir(dirname($log), 0, TRUE);
+    if (! ($fp = fopen($log, "a")))
+        die("Can't create or open ".$log.PHP_EOL);
+}
+/*
+set values depending on the parameter
+exit with an error message if it is incorrect
+*/
+if (count($options[1]) > 0) {
+    switch (strtolower(trim($options[1][0]))) {
+        case 's':
+        case 'second':
+            $cost_divisor = 100 * 60 * 60;
+            $divisor = 1;
+            $api = 'secondhistory';
+            $intervalword = ' second';
+            $interval = 0;
+            $hist = 's';
+            break;
+        case 'm':
+        case 'minute':
+            $cost_divisor = 100 * 60;
+            $divisor = 60;
+            $api = 'minutehistory';
+            $intervalword = ' minute';
+            $interval = 1;
+            $hist = 'm';
+            break;
+        case 'h':
+        case 'hour':
+            $cost_divisor = 100;
+            $divisor = 60 * 60;
+            $api = 'hourhistory';
+            $intervalword = ' hour';
+            $interval = 2;
+            $hist = 'h';
+            break;
+        case 'd':
+        case 'day':
+            $cost_divisor = 100;
+            $divisor = 60 * 60 * 24;
+            $api = 'dayhistory';
+            $intervalword = ' day';
+            $interval = 3;
+            $hist = 'd';
+            break;
+        case 'o':
+        case 'month':
+            $cost_divisor = 100;
+            $divisor = 60 * 60 * 24 * 28;
+            $api = 'monthhistory';
+            $intervalword = ' month';
+            $interval = 4;
+            $hist = 'o';
+            break;
+        default:
+            echo "Invalid argument: "
+                .strtolower($options[1][0]).PHP_EOL
+                ."\t".$parameters.PHP_EOL
+                ."\tTry ".$argv[0]." --help".PHP_EOL;
+                exit;
+            break;
+    }
+} else {
+    echo "An argument is required: ".PHP_EOL
+        ."\t".$parameters.PHP_EOL
+        ."\tTry ".$argv[0]." --help".PHP_EOL;
+    exit;
+}
+/*
+Start time for progress messsges
+*/
 if (! $quiet) $start_ts = time();
-/* Set the century */
+/*
+Set the century
+*/
 $century = substr(date('Y'), 0, 2);
-/* Connect to the server and the database */
+/*
+Connect to the server and the database
+*/
 $mysqli = new mysqli(
-        $TED_DB_HOST,
-        $TED_DB_USER,
-        $TED_DB_PASS,
-        $TED_DB_NAME);
-if ($mysqli->connect_error) {
+    $TED_DB_HOST,
+    $TED_DB_USER,
+    $TED_DB_PASS,
+    $TED_DB_NAME);
+if ($mysqli->connect_error)
     die('Connect Error ('.$mysqli->connect_errno.') '
         .$mysqli->connect_error);
-}
-/* Instantiate the TED_PHP object */
+/*
+Instantiate the TED_PHP object
+*/
 $ted = new TED_PHP(
     $TED_HOSTNAME,
     $TED_PORT,
@@ -188,22 +313,26 @@ $ted = new TED_PHP(
     $TED_MTU,
     $TED_TYPE,
     $TED_FORMAT);
-/* find out how many MTUs are installed */
+/*
+find out how many MTUs are installed
+*/
 $ted->set_api('livedata');
 $live = simplexml2array($ted->fetch());
 for ($i = 1; $i < 5; $i++)
     $mtulist[$i] =
         $live['Voltage']['MTU'.$i]['VoltageNow'];
-/* now go and get the history data */
+/*
+now go and get the history data
+*/
 $ted->set_api($api);
 $ted->set_format('raw');
 foreach ($mtulist as $mtu => $volts) {
     if ($volts != 0) { // then the MTU is installed.
         /*
-        * Get the number of seconds since the last update,
-        * fall back on the time since TED-5000 introduction.
-        * The subquery in the WHERE ensures that both
-        * timestamps are from the same record.
+        Get the number of seconds since the last update,
+        fall back on the time since TED-5000 introduction.
+        The subquery in the WHERE ensures that both
+        timestamps are from the same record.
         */
         $query = <<<EOQ
             SELECT
@@ -211,9 +340,9 @@ foreach ($mtulist as $mtu => $volts) {
                 - UNIX_TIMESTAMP(`ted_ts`) AS `last_update`,
             UNIX_TIMESTAMP(`ted_ts`)
                 - UNIX_TIMESTAMP(`ins_ts`) AS 'max_offset'
-            FROM `$TED_TABLE`
+            FROM `$TED_DB_TABLE`
             WHERE `ted_ts` =
-            (SELECT MAX(`ted_ts`) FROM `$TED_TABLE`
+            (SELECT MAX(`ted_ts`) FROM `$TED_DB_TABLE`
                 WHERE `hist` = '$hist'
                 AND `mtu` = $mtu)
             AND `hist` = '$hist'
@@ -242,7 +371,7 @@ EOQ;
                 .' records from TED.'.PHP_EOL;
         }
         $ted->set_mtu($mtu - 1);
-        if (! $quiet && $debug) {
+        if ($debug) {
             $settings = array('host', 'port', 'username', 'password',
                         'ssl', 'api', 'mtu', 'type', 'format');
             foreach ($settings as $s => $v) {
@@ -254,13 +383,15 @@ EOQ;
             }
         }
         $moments = $ted->fetch(1, $records_to_get, FALSE);
-        if (! $quiet) {
+        if (! $quiet || isset($log)) {
             $a = 0;
             $inserted_rows = 0;
             $updated_rows = 0;
             $recs_found = count($moments);
         }
-        /* Loop through the results and insert into the table */
+        /*
+        Loop through the results and insert into the table
+        */
         foreach($moments as $moment) {
             $ted_ts =
                 $century
@@ -296,42 +427,63 @@ EOQ;
             $pwr = $moment['power'] / ($cost_divisor * 10);
             $cst = $moment['cost'] / $cost_divisor;
             $query = <<<EOQ
-                INSERT INTO `$TED_TABLE`
+                INSERT INTO `$TED_DB_TABLE`
                 (`ted_ts`, `mtu`, `hist`, `pwr`, `cost`)
                 VALUES
                 ('{$ted_ts}', {$mtu}, '{$hist}', {$pwr}, {$cst})
                 ON DUPLICATE KEY UPDATE
                 `pwr` = VALUES(`pwr`), `cost` = VALUES(`cost`);
 EOQ;
-            /* Insert the record */
+            /*
+            Insert the record
+            */
             $mysqli->query($query);
-            if (! $quiet) {
+            if (! $quiet || isset($log)) {
                 switch ($mysqli->affected_rows) {
                     case 1: $inserted_rows += 1; break;
                     case 2: $updated_rows  += 1; break;
                     default: break;
                 }
                 $a++;
-                /* Display progress for large updates */
+                /*
+                Display progress for large updates
+                */
                 if($a % 25 == 0) echo ".";
                 if($a % 1250 == 0) echo PHP_EOL;
             }
         }
-        /* Output number of records updated and inserted */
+        /*
+        Output number of records updated and inserted
+        */
         if (! $quiet) {
             echo
-             "\tInserted ".number_format($inserted_rows)
+            "\tInserted ".number_format($inserted_rows)
             ." and updated ".number_format($updated_rows)
             ." SQL records from ".number_format($recs_found)
             ." TED records.".PHP_EOL;
         }
+        /*
+        Write statistics to a log file
+        */
+        if (isset($log)) {
+            if (! fwrite($fp, date('c')
+                .','.$mtu
+                .','.$hist
+                .','.$inserted_rows
+                .','.$updated_rows
+                .','.$recs_found
+                .PHP_EOL)) die("Can't write to ".$log);
+        }
     }
 }
-if (! $quiet) 
+if (! $quiet)
         echo PHP_EOL
         ."  * Run time:".PHP_EOL."\tLess than "
         .number_format(time() - $start_ts + 1)
         ." seconds.".PHP_EOL;
-/* close connection to database server */
+/*
+close connections
+*/
+if (isset($log)) fclose($fp);
 $mysqli->close();
 ?>
