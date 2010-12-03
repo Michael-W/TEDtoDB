@@ -1,15 +1,22 @@
 <?php
 # By Michael Wetmore.
 # VERSIONS:
-# $version = '1.0.0 23 November 2010';
-$version = '1.1.0 28 November 2010';
+# $version = '1.0.0 - 23 November 2010';
+# $version = '1.1.0 - 28 November 2010';
 /*
     Revised command line to make sense.  Now 'minute' etc. is a parameter
         not an option.
     Added option to log run data to a file.
     Added options for all TED and MySQL parameters.
 */
-# $version = 'next - sometime soon';
+$version = '1.1.1 - 3 December 2010';
+/*
+    Cleaned up arithmetic to determine number of records to retrieve 
+	    by dividing after adding last_update and max_offset - was before.
+	Added more debug output.
+	No more '1 records' in non-quiet output.
+*/
+# $version = 'x.x.x - 31 December 2050';
 /*
     Option to log to a database table.
     Create database tables if not found.
@@ -261,7 +268,7 @@ if (count($options[1]) > 0) {
         case 'o':
         case 'month':
             $cost_divisor = 100;
-            $divisor = 60 * 60 * 24 * 28;
+            $divisor = 60 * 60 * 24 * 30;
             $api = 'monthhistory';
             $intervalword = ' month';
             $interval = 4;
@@ -348,27 +355,27 @@ foreach ($mtulist as $mtu => $volts) {
             AND `hist` = '$hist'
             AND `mtu` = $mtu;
 EOQ;
-        $last_update = ceil((time()
-                    - strtotime("1 June 2009")) / $divisor);
-        $max_offset  = 0;
+        $last_update = time() - strtotime("1 June 2009");
+        $max_offset = 0;
         if ($result = $mysqli->query($query, MYSQLI_STORE_RESULT)) {
             if ($result->num_rows > 0) {
                 $row = $result->fetch_assoc();
-                $last_update = ceil($row['last_update'] / $divisor);
-                $max_offset  = ceil($row['max_offset'] / $divisor);
+                $last_update = $row['last_update'];
+                $max_offset  = $row['max_offset'];
+				if ($debug) print_r($row);
             }
         }
         $result->close();
-        if ($max_offset < 0) $max_offset = 1;
-        $records_to_get = $last_update + $max_offset + 1;
+        $records_to_get = ceil(($last_update + $max_offset) / $divisor);
         if (! $quiet) {
             echo PHP_EOL."  * For MTU".$mtu.":".PHP_EOL
                 ."\tLast update was "
-                .number_format($last_update)
+                .number_format($last_update / $divisor, 2)
                 .$intervalword.'s ago.'
                 ."  Will retrieve "
                 .number_format($records_to_get)
-                .' records from TED.'.PHP_EOL;
+                .' record'.($records_to_get > 1 ? 's' : '')
+				.' from TED.'.PHP_EOL;
         }
         $ted->set_mtu($mtu - 1);
         if ($debug) {
@@ -392,6 +399,7 @@ EOQ;
         /*
         Loop through the results and insert into the table
         */
+		if ($debug) print_r($moments);
         foreach($moments as $moment) {
             $ted_ts =
                 $century
